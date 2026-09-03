@@ -419,3 +419,176 @@ class LocalRecipeDatabase:
                 ]
             )
         ]
+
+
+# ============================================================
+# RECIPE DATABASE CLIENT
+# ============================================================
+
+class MealDBClient:
+
+    BASE_URL = "https://www.themealdb.com/api/json/v1/1/"
+
+    def __init__(self):
+        self.local_recipes = LocalRecipeDatabase.get_recipes()
+
+    def get_all_local_recipes(self):
+        return self.local_recipes
+
+    @staticmethod
+    def clean(text):
+        return re.sub(
+            r"\s+",
+            " ",
+            text.lower().strip()
+        )
+
+    def search_by_name(self, name):
+
+        query = self.clean(name)
+
+        local = [
+            recipe for recipe in self.local_recipes
+            if query in self.clean(recipe.name)
+            or query in self.clean(recipe.cuisine)
+            or query in self.clean(recipe.category)
+        ]
+
+        return local or self._themealdb_search(name)
+
+    def filter_by_ingredient(self, ingredient):
+
+        query = self.clean(ingredient)
+
+        local = [
+            recipe for recipe in self.local_recipes
+            if any(
+                query in self.clean(
+                    item.get("item", "")
+                )
+                for item in recipe.ingredients
+            )
+        ]
+
+        return local or self._themealdb_ingredient(ingredient)
+
+    def filter_by_category(self, category):
+
+        query = self.clean(category)
+
+        return [
+            recipe for recipe in self.local_recipes
+            if query in self.clean(recipe.category)
+        ]
+
+    def search_all(self, query):
+
+        return (
+            self.search_by_name(query)
+            or self.filter_by_ingredient(query)
+        )
+
+    def _themealdb_search(self, name):
+
+        try:
+
+            response = requests.get(
+                f"{self.BASE_URL}search.php",
+                params={"s": name},
+                timeout=10
+            )
+
+            response.raise_for_status()
+
+            meals = response.json().get("meals") or []
+
+            return [
+                self._convert(meal)
+                for meal in meals
+            ]
+
+        except requests.RequestException:
+            return []
+
+    def _themealdb_ingredient(self, ingredient):
+
+        try:
+
+            response = requests.get(
+                f"{self.BASE_URL}filter.php",
+                params={"i": ingredient},
+                timeout=10
+            )
+
+            response.raise_for_status()
+
+            meals = response.json().get("meals") or []
+
+            results = []
+
+            for meal in meals[:10]:
+
+                recipe = self.get_meal_by_id(
+                    meal.get("idMeal")
+                )
+
+                if recipe:
+                    results.append(recipe)
+
+            return results
+
+        except requests.RequestException:
+            return []
+
+    def get_meal_by_id(self, meal_id):
+
+        try:
+
+            response = requests.get(
+                f"{self.BASE_URL}lookup.php",
+                params={"i": meal_id},
+                timeout=10
+            )
+
+            response.raise_for_status()
+
+            meals = response.json().get("meals") or []
+
+            return (
+                self._convert(meals[0])
+                if meals
+                else None
+            )
+
+        except requests.RequestException:
+            return None
+
+    def _convert(self, meal):
+
+        ingredients = []
+
+        for i in range(1, 21):
+
+            item = meal.get(f"strIngredient{i}")
+            measure = meal.get(f"strMeasure{i}")
+
+            if item and item.strip():
+
+                ingredients.append({
+                    "item": item.strip(),
+                    "measure": (measure or "").strip()
+                })
+
+        return Recipe(
+            meal.get("idMeal", ""),
+            meal.get("strMeal", "Unknown Recipe"),
+            meal.get("strCategory", "General"),
+            meal.get("strArea", "International"),
+            meal.get(
+                "strInstructions",
+                "No instructions available."
+            ),
+            ingredients,
+            meal.get("strMealThumb", ""),
+            "TheMealDB"
+        )
