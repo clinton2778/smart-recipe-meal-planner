@@ -156,9 +156,10 @@ class Recipe:
             data.get("thumbnail", ""),
             data.get("source", "Local Recipe Database")
         )
- # ============================================================
+# ============================================================
 # LOCAL RECIPE DATABASE
-# ============================================================       
+# ============================================================
+
 class LocalRecipeDatabase:
 
     @staticmethod
@@ -298,7 +299,6 @@ class LocalRecipeDatabase:
                     {"item": "Salt", "measure": "1 tsp"}
                 ]
             ),
-
             Recipe(
                 "NG007",
                 "Moi Moi",
