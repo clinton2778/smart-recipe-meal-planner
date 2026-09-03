@@ -594,3 +594,133 @@ class MealDBClient:
             meal.get("strMealThumb", ""),
             "TheMealDB"
         )
+
+# ============================================================
+# MEAL PLANNER
+# ============================================================
+
+class MealPlanner:
+
+    def __init__(self, storage_dir="saved_data"):
+
+        os.makedirs(
+            storage_dir,
+            exist_ok=True
+        )
+
+        self.plan_file = os.path.join(
+            storage_dir,
+            "meal_plan.json"
+        )
+
+        self.shopping_file = os.path.join(
+            storage_dir,
+            "shopping_list.json"
+        )
+
+        self.favourites_file = os.path.join(
+            storage_dir,
+            "favourites.json"
+        )
+
+    def save_plan(self, plan, shopping):
+
+        try:
+
+            self._save(
+                self.plan_file,
+                plan
+            )
+
+            self._save(
+                self.shopping_file,
+                shopping
+            )
+
+            return True
+
+        except (IOError, TypeError) as e:
+
+            raise RuntimeError(
+                f"Could not save meal plan: {e}"
+            )
+
+    def load_plan(self):
+
+        return (
+            self._load(self.plan_file, []),
+            self._load(self.shopping_file, [])
+        )
+
+    def save_favourites(self, favourites):
+
+        try:
+
+            self._save(
+                self.favourites_file,
+                favourites
+            )
+
+            return True
+
+        except (IOError, TypeError) as e:
+
+            raise RuntimeError(
+                f"Could not save favourites: {e}"
+            )
+
+    def load_favourites(self):
+
+        return self._load(
+            self.favourites_file,
+            []
+        )
+
+    @staticmethod
+    def _save(filename, data):
+
+        with open(
+            filename,
+            "w",
+            encoding="utf-8"
+        ) as file:
+
+            json.dump(
+                data,
+                file,
+                indent=2,
+                ensure_ascii=False
+            )
+
+    @staticmethod
+    def _load(filename, default):
+
+        if not os.path.exists(filename):
+            return default
+
+        try:
+
+            with open(
+                filename,
+                "r",
+                encoding="utf-8"
+            ) as file:
+
+                return json.load(file)
+
+        except (
+            IOError,
+            json.JSONDecodeError
+        ):
+
+            return default
+
+    def clear_plan(self):
+
+        for file in [
+            self.plan_file,
+            self.shopping_file
+        ]:
+
+            if os.path.exists(file):
+                os.remove(file)
