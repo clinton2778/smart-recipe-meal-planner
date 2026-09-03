@@ -156,6 +156,9 @@ class Recipe:
             data.get("thumbnail", ""),
             data.get("source", "Local Recipe Database")
         )
+ # ============================================================
+# LOCAL RECIPE DATABASE
+# ============================================================       
 class LocalRecipeDatabase:
 
     @staticmethod
