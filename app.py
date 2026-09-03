@@ -407,3 +407,306 @@ with search_tab:
                         st.write(
                             f"- {item}"
                         )
+                        # ============================================================
+# WEEKLY PLANNER
+# ============================================================
+
+with planner_tab:
+
+    st.header("🗓️ Weekly Meal Planner")
+
+    st.write(
+        "Organise your meals from Monday to Sunday."
+    )
+
+    days = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday"
+    ]
+
+    if not meal_plan:
+
+        st.info(
+            "Your meal plan is empty. "
+            "Add recipes from the Search Recipes tab."
+        )
+
+    else:
+
+        for day in days:
+
+            st.subheader(f"📅 {day}")
+
+            day_meals = [
+                (i, item)
+                for i, item in enumerate(meal_plan)
+                if item.get("day") == day
+            ]
+
+            if not day_meals:
+
+                st.caption("No meal scheduled.")
+                continue
+
+            for index, item in day_meals:
+
+                recipe = item.get("recipe", {})
+
+                name = recipe.get(
+                    "name",
+                    "Unknown Recipe"
+                )
+
+                meal = item.get(
+                    "meal_type",
+                    "Meal"
+                )
+
+                c1, c2, c3 = st.columns(
+                    [2, 4, 1]
+                )
+
+                c1.write(f"**{meal}**")
+                c2.write(f"🍲 {name}")
+
+                if c3.button(
+                    "🗑️",
+                    key=f"delete_{index}"
+                ):
+
+                    meal_plan.pop(index)
+                    st.rerun()
+
+        st.divider()
+
+        if st.button(
+            "💾 Save Meal Plan",
+            type="primary"
+        ):
+
+            shopping = ShoppingListGenerator.generate(
+                meal_plan,
+                4
+            )
+
+            planner.save_plan(
+                meal_plan,
+                shopping
+            )
+
+            st.success(
+                "Meal plan saved successfully."
+            )
+
+
+# ============================================================
+# SHOPPING LIST
+# ============================================================
+
+with shopping_tab:
+
+    st.header("🛒 Shopping List")
+
+    servings_text = st.text_input(
+        "Number of servings",
+        "4"
+    )
+
+    if not re.fullmatch(
+        r"\d+",
+        servings_text.strip()
+    ):
+
+        st.error(
+            "Enter a valid whole number."
+        )
+
+    else:
+
+        servings = int(servings_text)
+
+        if not 1 <= servings <= 20:
+
+            st.error(
+                "Servings must be between 1 and 20."
+            )
+
+        elif not meal_plan:
+
+            st.info(
+                "Add recipes to your meal plan first."
+            )
+
+        else:
+
+            try:
+
+                shopping = (
+                    ShoppingListGenerator.generate(
+                        meal_plan,
+                        servings
+                    )
+                )
+
+                st.subheader(
+                    f"🛍️ Ingredients for "
+                    f"{servings} people"
+                )
+
+                if not shopping:
+
+                    st.warning(
+                        "No ingredients found."
+                    )
+
+                else:
+
+                    df = pd.DataFrame({
+                        "Ingredient & Quantity": shopping,
+                        "Bought": [False] * len(shopping)
+                    })
+
+                    edited = st.data_editor(
+                        df,
+                        hide_index=True,
+                        use_container_width=True,
+                        column_config={
+                            "Bought":
+                                st.column_config.CheckboxColumn(
+                                    "Bought"
+                                )
+                        }
+                    )
+
+                    bought = int(
+                        edited["Bought"].sum()
+                    )
+
+                    total = len(edited)
+
+                    st.progress(
+                        bought / total
+                        if total else 0
+                    )
+
+                    st.write(
+                        f"**{bought} of {total} "
+                        f"items bought.**"
+                    )
+
+                    if st.button(
+                        "💾 Save Shopping List",
+                        type="primary"
+                    ):
+
+                        planner.save_plan(
+                            meal_plan,
+                            edited[
+                                "Ingredient & Quantity"
+                            ].tolist()
+                        )
+
+                        st.success(
+                            "Shopping list saved."
+                        )
+
+                    st.download_button(
+                        "⬇️ Download Shopping List",
+                        "\n".join(
+                            f"- {x}"
+                            for x in shopping
+                        ),
+                        "shopping_list.txt",
+                        "text/plain"
+                    )
+
+            except ValueError as e:
+
+                st.error(str(e))
+
+
+# ============================================================
+# FAVOURITES
+# ============================================================
+
+with favourite_tab:
+
+    st.header("❤️ Favourite Recipes")
+
+    if not favourites:
+
+        st.info(
+            "You have no favourite recipes yet."
+        )
+
+    else:
+
+        st.write(
+            f"You have **{len(favourites)} "
+            f"favourite recipes.**"
+        )
+
+        for data in favourites:
+
+            recipe = Recipe.from_dict(data)
+
+            with st.expander(
+                f"❤️ {recipe.name}"
+            ):
+
+                if recipe.thumbnail:
+
+                    st.image(
+                        recipe.thumbnail,
+                        use_container_width=True
+                    )
+
+                st.write(
+                    f"**Category:** {recipe.category}"
+                )
+
+                st.write(
+                    f"**Cuisine:** {recipe.cuisine}"
+                )
+
+                st.subheader("🥕 Ingredients")
+
+                for item in recipe.ingredients:
+
+                    st.write(
+                        f"- {item.get('measure', '')} "
+                        f"{item.get('item', '')}"
+                    )
+
+                if st.button(
+                    "➕ Add to Monday",
+                    key=f"fav_add_{recipe.id}"
+                ):
+
+                    meal_plan.append({
+                        "day": "Monday",
+                        "meal_type": "Dinner",
+                        "recipe": recipe.to_dict()
+                    })
+
+                    st.success(
+                        f"{recipe.name} added to Monday."
+                    )
+
+
+# ============================================================
+# FOOTER
+# ============================================================
+
+st.divider()
+
+st.caption(
+    "🍽️ Smart Recipe & Meal Planner | "
+    "Nigerian and international recipes | "
+    "Built with Python, Streamlit, Pandas and Gemini AI"
+)
