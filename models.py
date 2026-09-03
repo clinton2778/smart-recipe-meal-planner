@@ -594,6 +594,158 @@ class MealDBClient:
             meal.get("strMealThumb", ""),
             "TheMealDB"
         )
+# ============================================================
+# GEMINI AI
+# ============================================================
+
+class GeminiHelper:
+
+    def __init__(self, api_key=""):
+
+        self.api_key = api_key.strip()
+        self.client = None
+
+        if self.api_key and genai:
+
+            try:
+                self.client = genai.Client(
+                    api_key=self.api_key
+                )
+            except Exception:
+                pass
+
+    def is_available(self):
+        return self.client is not None
+
+    def enhance_recipe(self, recipe):
+
+        if not self.client:
+
+            return {
+                "difficulty": "Unavailable",
+                "simple_steps": [
+                    "Gemini AI is not available."
+                ],
+                "substitutions": []
+            }
+
+        prompt = f"""
+Analyze this recipe and return valid JSON.
+
+Recipe: {recipe.name}
+Cuisine: {recipe.cuisine}
+Category: {recipe.category}
+
+Ingredients:
+{json.dumps(recipe.ingredients)}
+
+Instructions:
+{recipe.instructions}
+
+Return:
+{{
+    "difficulty": "Easy, Medium, or Hard",
+    "simple_steps": ["step 1", "step 2"],
+    "substitutions": [
+        "ingredient -> substitute",
+        "ingredient -> substitute",
+        "ingredient -> substitute"
+    ]
+}}
+
+Keep the instructions simple.
+Suggest practical and affordable substitutes.
+Consider ingredients commonly available in Nigeria,
+but also provide alternatives suitable for international recipes.
+Return JSON only.
+"""
+
+        try:
+
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+
+            text = re.sub(
+                r"```json|```",
+                "",
+                response.text
+            ).strip()
+
+            result = json.loads(text)
+
+            return {
+                "difficulty": result.get(
+                    "difficulty",
+                    "Medium"
+                ),
+                "simple_steps": result.get(
+                    "simple_steps",
+                    []
+                ),
+                "substitutions": result.get(
+                    "substitutions",
+                    []
+                )
+            }
+
+        except Exception as e:
+
+            return {
+                "difficulty": "Unknown",
+                "simple_steps": [
+                    recipe.instructions
+                ],
+                "substitutions": [
+                    f"AI error: {e}"
+                ]
+            }
+
+
+# ============================================================
+# SHOPPING LIST
+# ============================================================
+
+class ShoppingListGenerator:
+
+    @staticmethod
+    def generate(meal_plan, servings):
+
+        if servings < 1:
+            raise ValueError(
+                "Number of servings must be at least 1."
+            )
+
+        shopping = {}
+
+        for item in meal_plan:
+
+            if isinstance(item, Recipe):
+
+                recipe = item
+
+            elif isinstance(item, dict):
+
+                recipe = Recipe.from_dict(
+                    item.get("recipe", item)
+                )
+
+            else:
+                continue
+
+            for ingredient in recipe.scale_ingredients(
+                servings
+            ):
+
+                key = ingredient.lower()
+
+                if key not in shopping:
+                    shopping[key] = ingredient
+
+        return list(shopping.values())
+
+
 
 # ============================================================
 # MEAL PLANNER
