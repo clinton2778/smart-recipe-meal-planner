@@ -205,4 +205,205 @@ with search_tab:
             f"🍽️ Recipe Results ({len(results)})"
         )
 
-        for recipe in results:
+        for recipe in results: 
+
+            with st.expander(
+                f"🍲 {recipe.name} | "
+                f"{recipe.cuisine} | "
+                f"{recipe.category}"
+            ):
+
+                c1, c2 = st.columns([1, 2])
+
+                with c1:
+
+                    if recipe.thumbnail:
+                        st.image(
+                            recipe.thumbnail,
+                            use_container_width=True
+                        )
+                    else:
+                        st.write("🍲")
+
+                with c2:
+
+                    st.write(
+                        f"**Cuisine:** {recipe.cuisine}"
+                    )
+
+                    st.write(
+                        f"**Category:** {recipe.category}"
+                    )
+
+                    st.write(
+                        f"**Source:** {recipe.source}"
+                    )
+
+                    st.subheader("🥕 Ingredients")
+
+                    for item in recipe.ingredients:
+
+                        st.write(
+                            f"- {item.get('measure', '')} "
+                            f"{item.get('item', '')}"
+                        )
+
+                st.subheader("👨‍🍳 Cooking Instructions")
+
+                st.write(recipe.instructions)
+
+                # ------------------------------------------------
+                # Add to planner
+                # ------------------------------------------------
+
+                st.subheader("🗓️ Add To Meal Plan")
+
+                c1, c2, c3 = st.columns([2, 2, 1])
+
+                day = c1.selectbox(
+                    "Day",
+                    [
+                        "Monday",
+                        "Tuesday",
+                        "Wednesday",
+                        "Thursday",
+                        "Friday",
+                        "Saturday",
+                        "Sunday"
+                    ],
+                    key=f"day_{recipe.id}"
+                )
+
+                meal = c2.selectbox(
+                    "Meal",
+                    [
+                        "Breakfast",
+                        "Lunch",
+                        "Dinner"
+                    ],
+                    key=f"meal_{recipe.id}"
+                )
+
+                if c3.button(
+                    "➕ Add",
+                    key=f"add_{recipe.id}"
+                ):
+
+                    meal_plan.append({
+                        "day": day,
+                        "meal_type": meal,
+                        "recipe": recipe.to_dict()
+                    })
+
+                    st.success(
+                        f"{recipe.name} added to {day}."
+                    )
+
+                st.divider()
+
+                # ------------------------------------------------
+                # Favourite
+                # ------------------------------------------------
+
+                favourite_ids = [
+                    str(x.get("id"))
+                    for x in favourites
+                ]
+
+                if str(recipe.id) in favourite_ids:
+
+                    if st.button(
+                        "💔 Remove Favourite",
+                        key=f"remove_fav_{recipe.id}"
+                    ):
+
+                        st.session_state.favourites = [
+                            x for x in favourites
+                            if str(x.get("id"))
+                            != str(recipe.id)
+                        ]
+
+                        planner.save_favourites(
+                            st.session_state.favourites
+                        )
+
+                        st.rerun()
+
+                else:
+
+                    if st.button(
+                        "❤️ Add Favourite",
+                        key=f"fav_{recipe.id}"
+                    ):
+
+                        favourites.append(
+                            recipe.to_dict()
+                        )
+
+                        planner.save_favourites(
+                            favourites
+                        )
+
+                        st.success(
+                            "Added to favourites."
+                        )
+
+                # ------------------------------------------------
+                # Gemini
+                # ------------------------------------------------
+
+                st.divider()
+
+                st.subheader("🤖 AI Recipe Help")
+
+                if st.button(
+                    "✨ Simplify Recipe",
+                    key=f"ai_{recipe.id}"
+                ):
+
+                    if not api_key:
+
+                        st.warning(
+                            "Enter your Gemini API key first."
+                        )
+
+                    else:
+
+                        with st.spinner(
+                            "Gemini is working..."
+                        ):
+
+                            ai_results[recipe.id] = (
+                                ai.enhance_recipe(recipe)
+                            )
+
+                if recipe.id in ai_results:
+
+                    info = ai_results[recipe.id]
+
+                    st.success(
+                        f"Difficulty: "
+                        f"{info.get('difficulty', 'Unknown')}"
+                    )
+
+                    st.write("**📝 Simple Steps**")
+
+                    for i, step in enumerate(
+                        info.get("simple_steps", []),
+                        1
+                    ):
+                        st.write(
+                            f"{i}. {step}"
+                        )
+
+                    st.write(
+                        "**💰 Local Substitutes**"
+                    )
+
+                    for item in info.get(
+                        "substitutions",
+                        []
+                    ):
+                        st.write(
+                            f"- {item}"
+                        )
